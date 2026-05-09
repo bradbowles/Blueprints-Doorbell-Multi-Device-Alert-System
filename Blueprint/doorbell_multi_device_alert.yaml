@@ -1,8 +1,8 @@
 blueprint:
   name: Doorbell - Multi-Device Alert System
   description: >
-    Sends snapshot, Sonos chime + TTS, phone notification, TV image notification,
-    and optional PiP-style overlay when the doorbell is triggered.
+    Sends snapshot, Sonos chime + TTS, phone notification, and optional PiP-style
+    overlay to TVs when the doorbell is triggered.
   domain: automation
 
   input:
@@ -53,7 +53,7 @@ blueprint:
       name: TV Media Player Group
       description: >
         Select the media_player group containing your Google TV / Chromecast devices.
-        Only TVs that are ON and available will receive notifications.
+        Only TVs that are ON and available will receive PiP overlays.
       selector:
         entity:
           domain: media_player
@@ -113,6 +113,8 @@ action:
   - variables:
       snapshot_url: "/local/temp/doorbell_snapshot.jpg?{{ now().timestamp() }}"
       tv_group_entity: !input tv_group
+      chime_file_value: !input chime_file
+      phone_notify_target: !input phone_notify_service
 
   # 3. Expand TV group safely (runtime-safe)
   - variables:
@@ -125,13 +127,13 @@ action:
 
   # 4. Optional chime
   - choose:
-      - conditions: "{{ (inputs.chime_file | length) > 0 }}"
+      - conditions: "{{ chime_file_value | length > 0 }}"
         sequence:
           - service: media_player.play_media
             target:
               entity_id: !input sonos_group
             data:
-              media_content_id: "{{ inputs.chime_file }}"
+              media_content_id: "{{ chime_file_value }}"
               media_content_type: music
 
   # 5. Sonos TTS announcement
@@ -144,15 +146,11 @@ action:
       message: "Someone is at the front door"
       language: en-US
 
-  # 6. Phone notification (safe pattern)
-  - variables:
-      phone_notify_target: !input phone_notify_service
-
-  # Call the phone notify service dynamically
+  # 6. Phone notification (dynamic service call)
   - choose:
-      - conditions: "{{ phone_notify_service is string }}"
+      - conditions: "{{ phone_notify_target is string }}"
         sequence:
-          - service: "{{ phone_notify_service }}"
+          - service: "{{ phone_notify_target }}"
             data:
               title: "Front Door Alert"
               message: "Someone is at the front door"
@@ -160,21 +158,7 @@ action:
                 image: "{{ snapshot_url }}"
                 clickAction: "/our-home/security"
 
-
-  # 7. TV image notification
-  - choose:
-      - conditions: "{{ tvs | count > 0 }}"
-        sequence:
-          - repeat:
-              for_each: "{{ tvs }}"
-              sequence:
-                - service: notify.notify
-                  data:
-                    target: "{{ repeat.item }}"
-                    data:
-                      image: "{{ snapshot_url }}"
-
-  # 8. PiP overlay (optional)
+  # 7. PiP overlay (optional)
   - choose:
       - conditions: "{{ inputs.enable_pip and (tvs | count > 0) }}"
         sequence:
