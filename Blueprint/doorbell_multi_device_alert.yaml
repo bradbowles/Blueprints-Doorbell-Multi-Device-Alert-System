@@ -158,7 +158,7 @@ action:
                 image: "{{ snapshot_url }}"
                 clickAction: "/our-home/security"
 
-  # 7. PiP overlay (optional)
+  # 7. Cast snapshot to TVs using Media Source
   - choose:
       - conditions: "{{ inputs.enable_pip and (tvs | count > 0) }}"
         sequence:
@@ -166,5 +166,5 @@ action:
             target:
               entity_id: "{{ tvs }}"
             data:
-              media_content_id: "/local/pip.html?img={{ snapshot_url }}"
-              media_content_type: url
+              media_content_id: "media-source://media_source/local/doorbell/doorbell_snapshot.jpg"
+              media_content_type: image/jpeg
