@@ -8,53 +8,79 @@ blueprint:
   input:
     doorbell_trigger:
       name: Doorbell Trigger (ding)
+      description: >
+        Select the binary_sensor that turns ON when the doorbell button is pressed.
+        For Aarlo, this is typically binary_sensor.aarlo_ding_video_doorbell.
       selector:
         entity:
           domain: binary_sensor
 
     snapshot_switch:
       name: Snapshot Trigger Switch
+      description: >
+        Select the switch that forces your doorbell camera to take a snapshot.
+        For Aarlo, this is switch.aarlo_snapshot_video_doorbell.
       selector:
         entity:
           domain: switch
 
     camera_entity:
       name: Doorbell Camera
+      description: >
+        Select the camera entity used to capture the snapshot.
+        For Aarlo, this is camera.aarlo_video_doorbell.
       selector:
         entity:
           domain: camera
 
     sonos_group:
       name: Sonos Group
+      description: >
+        Select the Sonos media_player group that should play the chime and TTS announcement.
       selector:
         entity:
           domain: media_player
 
     phone_notify_service:
-      name: Phone Notify Service (e.g. notify.mobile_app_brads_fold_6)
+      name: Phone Notify Service
+      description: >
+        Enter the notify service for your phone (e.g. notify.mobile_app_brads_fold_6).
+        This will receive the snapshot and alert message.
       selector:
         text:
 
     tv_group:
       name: TV Media Player Group
+      description: >
+        Select the media_player group containing your Google TV / Chromecast devices.
+        Only TVs that are ON and available will receive notifications.
       selector:
         entity:
           domain: media_player
 
     tts_engine:
       name: TTS Engine
+      description: >
+        Select the TTS engine used for the spoken announcement.
+        Example: tts.google_en_com.
       selector:
         entity:
           domain: tts
 
     chime_file:
       name: Chime File (optional, /local path)
+      description: >
+        Optional: Provide a /local/ path to a chime sound to play before the TTS message.
+        Leave blank to disable the chime.
       default: ""
       selector:
         text:
 
     enable_pip:
       name: Enable PiP-style Overlay (HTML page cast)
+      description: >
+        When enabled, the snapshot will be cast as a picture-in-picture overlay
+        to all active TVs using /local/pip.html.
       default: false
       selector:
         boolean:
@@ -115,8 +141,9 @@ action:
       language: en-au
 
   # 5. Phone notification
-  - service: "{{ inputs.phone_notify_service }}"
+  - service: notify.notify
     data:
+      target: "{{ inputs.phone_notify_service }}"
       title: "Front Door Alert"
       message: "Someone is at the front door"
       data:
