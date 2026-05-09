@@ -109,17 +109,21 @@ action:
 
   - service: shell_command.fix_doorbell_snapshot
 
-  # 2. Prepare dynamic variables
+  # 2. Resolve inputs into usable variables
   - variables:
       snapshot_url: "/local/temp/doorbell_snapshot.jpg?{{ now().timestamp() }}"
+      tv_group_entity: !input tv_group
+
+  # 3. Expand TV group safely (runtime-safe)
+  - variables:
       tvs: >
-        {{ expand(states[inputs.tv_group].entity_id)
+        {{ expand(tv_group_entity)
            | selectattr('state','eq','on')
            | selectattr('state','ne','unavailable')
            | map(attribute='entity_id')
            | list }}
 
-  # 3. Optional chime
+  # 4. Optional chime
   - choose:
       - conditions: "{{ (inputs.chime_file | length) > 0 }}"
         sequence:
@@ -130,7 +134,7 @@ action:
               media_content_id: "{{ inputs.chime_file }}"
               media_content_type: music
 
-  # 4. Sonos TTS announcement
+  # 5. Sonos TTS announcement
   - service: tts.speak
     target:
       entity_id: !input tts_engine
@@ -140,7 +144,7 @@ action:
       message: "Someone is at the front door"
       language: en-au
 
-  # 5. Phone notification
+  # 6. Phone notification (safe pattern)
   - service: notify.notify
     data:
       target: "{{ inputs.phone_notify_service }}"
@@ -150,7 +154,7 @@ action:
         image: "{{ snapshot_url }}"
         clickAction: "/our-home/security"
 
-  # 6. TV image notification
+  # 7. TV image notification
   - choose:
       - conditions: "{{ tvs | count > 0 }}"
         sequence:
@@ -163,7 +167,7 @@ action:
                     data:
                       image: "{{ snapshot_url }}"
 
-  # 7. PiP overlay (optional)
+  # 8. PiP overlay (optional)
   - choose:
       - conditions: "{{ inputs.enable_pip and (tvs | count > 0) }}"
         sequence:
