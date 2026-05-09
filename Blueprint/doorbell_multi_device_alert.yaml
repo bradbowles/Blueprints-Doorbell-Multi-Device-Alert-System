@@ -1,39 +1,31 @@
 blueprint:
-  name: Doorbell - Multi-Device Alert System
+  name: Doorbell - Multi-Device Alert System (TvOverlay)
   description: >
-    Sends snapshot, Sonos chime + TTS, phone notification, and TV image display
-    (via media source casting) when the doorbell is triggered.
+    Sends snapshot, Sonos chime + TTS, phone notification, and TvOverlay
+    notification on the TV when the doorbell is triggered.
   domain: automation
 
   input:
     doorbell_trigger:
       name: Doorbell Trigger (ding)
-      description: >
-        Select the binary_sensor that turns ON when the doorbell button is pressed.
       selector:
         entity:
           domain: binary_sensor
 
     snapshot_switch:
       name: Snapshot Trigger Switch
-      description: >
-        Select the switch that forces your doorbell camera to take a snapshot.
       selector:
         entity:
           domain: switch
 
     camera_entity:
       name: Doorbell Camera
-      description: >
-        Select the camera entity used to capture the snapshot.
       selector:
         entity:
           domain: camera
 
     sonos_group:
       name: Sonos Group
-      description: >
-        Select the Sonos media_player group that should play the chime and TTS announcement.
       selector:
         entity:
           domain: media_player
@@ -51,40 +43,24 @@ blueprint:
 
     phone_notify_service:
       name: Phone Notify Service
-      description: >
-        Enter the notify service for your phone (e.g. notify.mobile_app_brads_fold_6).
+      description: e.g. notify.mobile_app_brads_fold_6
       selector:
         text:
 
-    tv_group:
-      name: TV Media Player Group
-      description: >
-        Select the media_player group containing your Google TV / Chromecast devices.
-      selector:
-        entity:
-          domain: media_player
-
     tts_engine:
       name: TTS Engine
-      description: >
-        Select the TTS engine used for the spoken announcement.
       selector:
         entity:
           domain: tts
 
     chime_file:
       name: Chime File (optional, /media or /local path)
-      description: >
-        Optional: Provide a path to a chime sound to play before the TTS message.
       default: ""
       selector:
         text:
 
-    enable_pip:
-      name: Enable TV Image Cast
-      description: >
-        When enabled, the snapshot will be cast as an image to all active TVs
-        using the media source system.
+    enable_tv_overlay:
+      name: Enable TvOverlay notification
       default: true
       selector:
         boolean:
@@ -97,7 +73,6 @@ trigger:
     to: "on"
 
 action:
-
   # 1. Trigger snapshot
   - service: switch.turn_on
     target:
@@ -113,24 +88,14 @@ action:
 
   # 2. Resolve inputs into usable variables
   - variables:
-      snapshot_media_source: "media-source://media_source/local/doorbell/doorbell_snapshot.jpg"
-      tv_group_entity: !input tv_group
       chime_file_value: !input chime_file
       phone_notify_target: !input phone_notify_service
-      enable_pip_value: !input enable_pip
+      enable_tv_overlay_value: !input enable_tv_overlay
       sonos_entity: !input sonos_group
       original_sonos_volume: "{{ state_attr(sonos_entity, 'volume_level') }}"
+      image_path: "/media/local/doorbell/doorbell_snapshot.jpg"
 
-  # 3. Expand TV group safely
-  - variables:
-      tvs: >
-        {{ expand(tv_group_entity)
-           | selectattr('state','eq','on')
-           | selectattr('state','ne','unavailable')
-           | map(attribute='entity_id')
-           | list }}
-
-  # 4. Optional chime
+  # 3. Optional chime
   - choose:
       - conditions: "{{ chime_file_value | length > 0 }}"
         sequence:
@@ -141,14 +106,14 @@ action:
               media_content_id: "{{ chime_file_value }}"
               media_content_type: music
 
-  # 5. Set Sonos volume for announcement
+  # 4. Set Sonos volume for announcement
   - service: media_player.volume_set
     target:
       entity_id: !input sonos_group
     data:
       volume_level: !input sonos_volume
 
-  # 6. Sonos TTS announcement
+  # 5. Sonos TTS announcement
   - service: tts.speak
     target:
       entity_id: !input tts_engine
@@ -158,7 +123,7 @@ action:
       message: "Someone is at the front door"
       language: en-US
 
-  # 7. Restore original Sonos volume
+  # 6. Restore original Sonos volume
   - delay: "00:00:02"
   - service: media_player.volume_set
     target:
@@ -166,7 +131,7 @@ action:
     data:
       volume_level: "{{ original_sonos_volume }}"
 
-  # 8. Phone notification
+  # 7. Phone notification
   - choose:
       - conditions: "{{ phone_notify_target is string and phone_notify_target | length > 0 }}"
         sequence:
@@ -175,15 +140,12 @@ action:
               title: "Front Door Alert"
               message: "Someone is at the front door"
               data:
-                image: "/media/local/doorbell/doorbell_snapshot.jpg"
+                image: "{{ image_path }}"
 
-  # 9. TV image cast via Media Source
+  # 8. TvOverlay notification
   - choose:
-      - conditions: "{{ enable_pip_value and (tvs | count > 0) }}"
+      - conditions: "{{ enable_tv_overlay_value }}"
         sequence:
-          - service: media_player.play_media
-            target:
-              entity_id: "{{ tvs }}"
+          - service: rest_command.tvoverlay_doorbell
             data:
-              media_content_id: "{{ snapshot_media_source }}"
-              media_content_type: image
+              image_path: "{{ image_path }}"
