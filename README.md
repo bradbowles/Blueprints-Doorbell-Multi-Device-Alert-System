@@ -13,7 +13,9 @@ This Home Assistant blueprint sends a snapshot and alerts to multiple devices wh
 ## 📥 Import Blueprint
 Click below to import directly into Home Assistant:
 
-Import Blueprint (my.home-assistant.io in Bing)
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](
+https://my.home-assistant.io/redirect/blueprint_import/?url=https://raw.githubusercontent.com/bradbowles/Blueprints-Doorbell-Multi-Device-Alert-System/main/Blueprint/doorbell_multi_device_alert.yaml
+)
 
 ## 📂 Installation
 1. Copy the PiP overlay file<br>
