@@ -10,7 +10,6 @@ blueprint:
       name: Doorbell Trigger (ding)
       description: >
         Select the binary_sensor that turns ON when the doorbell button is pressed.
-        For Aarlo, this is typically binary_sensor.aarlo_ding_video_doorbell.
       selector:
         entity:
           domain: binary_sensor
@@ -19,7 +18,6 @@ blueprint:
       name: Snapshot Trigger Switch
       description: >
         Select the switch that forces your doorbell camera to take a snapshot.
-        For Aarlo, this is switch.aarlo_snapshot_video_doorbell.
       selector:
         entity:
           domain: switch
@@ -28,7 +26,6 @@ blueprint:
       name: Doorbell Camera
       description: >
         Select the camera entity used to capture the snapshot.
-        For Aarlo, this is camera.aarlo_video_doorbell.
       selector:
         entity:
           domain: camera
@@ -56,7 +53,6 @@ blueprint:
       name: Phone Notify Service
       description: >
         Enter the notify service for your phone (e.g. notify.mobile_app_brads_fold_6).
-        This will receive the snapshot and alert message.
       selector:
         text:
 
@@ -64,7 +60,6 @@ blueprint:
       name: TV Media Player Group
       description: >
         Select the media_player group containing your Google TV / Chromecast devices.
-        Only TVs that are ON and available will receive the image cast.
       selector:
         entity:
           domain: media_player
@@ -73,7 +68,6 @@ blueprint:
       name: TTS Engine
       description: >
         Select the TTS engine used for the spoken announcement.
-        Example: tts.google_en_com.
       selector:
         entity:
           domain: tts
@@ -82,7 +76,6 @@ blueprint:
       name: Chime File (optional, /media or /local path)
       description: >
         Optional: Provide a path to a chime sound to play before the TTS message.
-        Leave blank to disable the chime.
       default: ""
       selector:
         text:
@@ -104,6 +97,7 @@ trigger:
     to: "on"
 
 action:
+
   # 1. Trigger snapshot
   - service: switch.turn_on
     target:
@@ -117,19 +111,17 @@ action:
     data:
       filename: "/media/doorbell/doorbell_snapshot.jpg"
 
-  # Optional: adjust path/permissions via shell_command if you use one
-  # - service: shell_command.fix_doorbell_snapshot
-
   # 2. Resolve inputs into usable variables
   - variables:
-      # Media Source path (no querystring; media_source handles latest file)
       snapshot_media_source: "media-source://media_source/local/doorbell/doorbell_snapshot.jpg"
       tv_group_entity: !input tv_group
       chime_file_value: !input chime_file
       phone_notify_target: !input phone_notify_service
       enable_pip_value: !input enable_pip
+      sonos_entity: !input sonos_group
+      original_sonos_volume: "{{ state_attr(sonos_entity, 'volume_level') }}"
 
-  # 3. Expand TV group safely (runtime-safe)
+  # 3. Expand TV group safely
   - variables:
       tvs: >
         {{ expand(tv_group_entity)
@@ -149,7 +141,7 @@ action:
               media_content_id: "{{ chime_file_value }}"
               media_content_type: music
 
-  # 5. Set Sonos volume
+  # 5. Set Sonos volume for announcement
   - service: media_player.volume_set
     target:
       entity_id: !input sonos_group
@@ -166,7 +158,15 @@ action:
       message: "Someone is at the front door"
       language: en-US
 
-  # 7. Phone notification (dynamic service call)
+  # 7. Restore original Sonos volume
+  - delay: "00:00:02"
+  - service: media_player.volume_set
+    target:
+      entity_id: !input sonos_group
+    data:
+      volume_level: "{{ original_sonos_volume }}"
+
+  # 8. Phone notification
   - choose:
       - conditions: "{{ phone_notify_target is string and phone_notify_target | length > 0 }}"
         sequence:
@@ -175,10 +175,9 @@ action:
               title: "Front Door Alert"
               message: "Someone is at the front door"
               data:
-                # Use the media URL if your phone app supports it; otherwise this can be omitted
                 image: "/media/local/doorbell/doorbell_snapshot.jpg"
 
-  # 8. TV image cast via Media Source
+  # 9. TV image cast via Media Source
   - choose:
       - conditions: "{{ enable_pip_value and (tvs | count > 0) }}"
         sequence:
@@ -187,4 +186,4 @@ action:
               entity_id: "{{ tvs }}"
             data:
               media_content_id: "{{ snapshot_media_source }}"
-              media_content_type: image/jpeg
+              media_content_type: image
