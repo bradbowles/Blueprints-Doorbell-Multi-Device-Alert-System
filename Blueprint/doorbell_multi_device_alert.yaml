@@ -1,8 +1,8 @@
 blueprint:
   name: Doorbell - Multi-Device Alert System
   description: >
-    Sends snapshot, Sonos chime + TTS, phone notification, and optional PiP-style
-    overlay to TVs when the doorbell is triggered.
+    Sends snapshot, Sonos chime + TTS, phone notification, and TV image display
+    (via media source casting) when the doorbell is triggered.
   domain: automation
 
   input:
@@ -41,6 +41,17 @@ blueprint:
         entity:
           domain: media_player
 
+    sonos_volume:
+      name: Sonos Volume
+      description: Set the volume level for the announcement.
+      default: 0.35
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.01
+          mode: slider
+
     phone_notify_service:
       name: Phone Notify Service
       description: >
@@ -53,7 +64,7 @@ blueprint:
       name: TV Media Player Group
       description: >
         Select the media_player group containing your Google TV / Chromecast devices.
-        Only TVs that are ON and available will receive PiP overlays.
+        Only TVs that are ON and available will receive the image cast.
       selector:
         entity:
           domain: media_player
@@ -68,20 +79,20 @@ blueprint:
           domain: tts
 
     chime_file:
-      name: Chime File (optional, /local path)
+      name: Chime File (optional, /media or /local path)
       description: >
-        Optional: Provide a /local/ path to a chime sound to play before the TTS message.
+        Optional: Provide a path to a chime sound to play before the TTS message.
         Leave blank to disable the chime.
       default: ""
       selector:
         text:
 
     enable_pip:
-      name: Enable PiP-style Overlay (HTML page cast)
+      name: Enable TV Image Cast
       description: >
-        When enabled, the snapshot will be cast as a picture-in-picture overlay
-        to all active TVs using /local/pip.html.
-      default: false
+        When enabled, the snapshot will be cast as an image to all active TVs
+        using the media source system.
+      default: true
       selector:
         boolean:
 
@@ -93,7 +104,6 @@ trigger:
     to: "on"
 
 action:
-
   # 1. Trigger snapshot
   - service: switch.turn_on
     target:
@@ -105,16 +115,19 @@ action:
     target:
       entity_id: !input camera_entity
     data:
-      filename: "/config/www/temp/doorbell_snapshot.jpg"
+      filename: "/media/doorbell/doorbell_snapshot.jpg"
 
-  - service: shell_command.fix_doorbell_snapshot
+  # Optional: adjust path/permissions via shell_command if you use one
+  # - service: shell_command.fix_doorbell_snapshot
 
   # 2. Resolve inputs into usable variables
   - variables:
-      snapshot_url: "/local/temp/doorbell_snapshot.jpg?{{ now().timestamp() }}"
+      # Media Source path (no querystring; media_source handles latest file)
+      snapshot_media_source: "media-source://media_source/local/doorbell/doorbell_snapshot.jpg"
       tv_group_entity: !input tv_group
       chime_file_value: !input chime_file
       phone_notify_target: !input phone_notify_service
+      enable_pip_value: !input enable_pip
 
   # 3. Expand TV group safely (runtime-safe)
   - variables:
@@ -136,7 +149,14 @@ action:
               media_content_id: "{{ chime_file_value }}"
               media_content_type: music
 
-  # 5. Sonos TTS announcement
+  # 5. Set Sonos volume
+  - service: media_player.volume_set
+    target:
+      entity_id: !input sonos_group
+    data:
+      volume_level: !input sonos_volume
+
+  # 6. Sonos TTS announcement
   - service: tts.speak
     target:
       entity_id: !input tts_engine
@@ -146,25 +166,25 @@ action:
       message: "Someone is at the front door"
       language: en-US
 
-  # 6. Phone notification (dynamic service call)
+  # 7. Phone notification (dynamic service call)
   - choose:
-      - conditions: "{{ phone_notify_target is string }}"
+      - conditions: "{{ phone_notify_target is string and phone_notify_target | length > 0 }}"
         sequence:
           - service: "{{ phone_notify_target }}"
             data:
               title: "Front Door Alert"
               message: "Someone is at the front door"
               data:
-                image: "{{ snapshot_url }}"
-                clickAction: "/our-home/security"
+                # Use the media URL if your phone app supports it; otherwise this can be omitted
+                image: "/media/local/doorbell/doorbell_snapshot.jpg"
 
-  # 7. Cast snapshot to TVs using Media Source
+  # 8. TV image cast via Media Source
   - choose:
-      - conditions: "{{ inputs.enable_pip and (tvs | count > 0) }}"
+      - conditions: "{{ enable_pip_value and (tvs | count > 0) }}"
         sequence:
           - service: media_player.play_media
             target:
               entity_id: "{{ tvs }}"
             data:
-              media_content_id: "media-source://media_source/local/doorbell/doorbell_snapshot.jpg"
+              media_content_id: "{{ snapshot_media_source }}"
               media_content_type: image/jpeg
