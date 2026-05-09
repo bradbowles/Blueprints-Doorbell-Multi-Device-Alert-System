@@ -73,6 +73,7 @@ trigger:
     to: "on"
 
 action:
+
   # 1. Trigger snapshot
   - service: switch.turn_on
     target:
@@ -86,11 +87,11 @@ action:
     data:
       filename: "/media/doorbell/doorbell_snapshot.jpg"
 
-  # 2. Resolve inputs into usable variables
+  # 2. Variables (single safe block)
   - variables:
       chime_file_value: !input chime_file
       phone_notify_target: !input phone_notify_service
-      enable_tv_overlay_value: !input enable_tv_overlay
+      enable_tv_overlay: !input enable_tv_overlay
       sonos_entity: !input sonos_group
       original_sonos_volume: "{{ state_attr(sonos_entity, 'volume_level') }}"
       image_path: "/media/local/doorbell/doorbell_snapshot.jpg"
@@ -144,7 +145,7 @@ action:
 
   # 8. TvOverlay notification
   - choose:
-      - conditions: "{{ enable_tv_overlay_value }}"
+      - conditions: "{{ enable_tv_overlay }}"
         sequence:
           - service: rest_command.tvoverlay_doorbell
             data:
