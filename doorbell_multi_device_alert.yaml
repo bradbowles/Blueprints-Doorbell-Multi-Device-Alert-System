@@ -1,0 +1,150 @@
+blueprint:
+  name: Doorbell – Multi-Device Alert System
+  description: >
+    Sends snapshot, Sonos chime + TTS, phone notification, TV image notification,
+    and optional PiP-style overlay when the doorbell is triggered.
+  domain: automation
+  input:
+    doorbell_trigger:
+      name: Doorbell Trigger
+      selector:
+        entity:
+          domain: binary_sensor
+
+    camera_entity:
+      name: Doorbell Camera
+      selector:
+        entity:
+          domain: camera
+
+    snapshot_switch:
+      name: Snapshot Trigger Switch
+      selector:
+        entity:
+          domain: switch
+
+    sonos_group:
+      name: Sonos Group
+      selector:
+        entity:
+          domain: media_player
+
+    phone_notify_service:
+      name: Phone Notify Service (e.g. notify.mobile_app_brads_fold_6)
+      selector:
+        text:
+
+    tv_group:
+      name: TV Group (all TVs / Chromecasts)
+      selector:
+        entity:
+          domain: group
+
+    tts_engine:
+      name: TTS Engine
+      selector:
+        entity:
+          domain: tts
+
+    chime_file:
+      name: Chime File (optional, /local path)
+      default: "/local/chime.mp3"
+      selector:
+        text:
+
+    enable_pip:
+      name: Enable PiP-style Overlay (HTML page cast)
+      default: false
+      selector:
+        boolean:
+
+mode: single
+
+variables:
+  snapshot_url: "https://nointernet.au/local/temp/doorbell_snapshot.jpg?{{ now().timestamp() }}"
+  tv_group_entity: !input tv_group
+  active_tvs: >
+    {{ expand(tv_group_entity)
+       | selectattr('state','eq','on')
+       | map(attribute='entity_id')
+       | list }}
+  phone_notify_service_var: !input phone_notify_service
+  sonos_group_entity: !input sonos_group
+  tts_engine_entity: !input tts_engine
+  chime_file_var: !input chime_file
+  enable_pip_var: !input enable_pip
+
+trigger:
+  - platform: state
+    entity_id: !input doorbell_trigger
+    to: "on"
+
+action:
+  # 1. Trigger snapshot
+  - service: switch.turn_on
+    target:
+      entity_id: !input snapshot_switch
+
+  - delay: "00:00:04"
+
+  - service: camera.snapshot
+    target:
+      entity_id: !input camera_entity
+    data:
+      filename: "/config/www/temp/doorbell_snapshot.jpg"
+
+  - service: shell_command.fix_doorbell_snapshot
+
+  # 2. Sonos chime (optional)
+  - choose:
+      - conditions: "{{ chime_file_var is string and chime_file_var != '' }}"
+        sequence:
+          - service: media_player.play_media
+            target:
+              entity_id: "{{ sonos_group_entity }}"
+            data:
+              media_content_id: "{{ chime_file_var }}"
+              media_content_type: music
+
+  # 3. Sonos TTS announcement
+  - service: tts.speak
+    target:
+      entity_id: "{{ tts_engine_entity }}"
+    data:
+      cache: true
+      media_player_entity_id: "{{ sonos_group_entity }}"
+      message: "Someone is at the front door"
+      language: en-au
+
+  # 4. Phone notification
+  - service: "{{ phone_notify_service_var }}"
+    data:
+      title: "Front Door Alert"
+      message: "Someone is at the front door"
+      data:
+        image: "{{ snapshot_url }}"
+        clickAction: "/our-home/security"
+
+  # 5. TV image notification (Chromecast / Google TV / cast targets)
+  - choose:
+      - conditions: "{{ active_tvs | count > 0 }}"
+        sequence:
+          - repeat:
+              for_each: "{{ active_tvs }}"
+              sequence:
+                - service: notify.notify
+                  data:
+                    target: "{{ repeat.item }}"
+                    data:
+                      image: "{{ snapshot_url }}"
+
+  # 6. PiP-style overlay via HTML page (optional)
+  - choose:
+      - conditions: "{{ enable_pip_var and (active_tvs | count > 0) }}"
+        sequence:
+          - service: media_player.play_media
+            target:
+              entity_id: "{{ active_tvs }}"
+            data:
+              media_content_id: "https://nointernet.au/local/pip.html?img={{ snapshot_url }}"
+              media_content_type: "url"
