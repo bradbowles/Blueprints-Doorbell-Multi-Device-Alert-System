@@ -142,7 +142,7 @@ action:
       cache: true
       media_player_entity_id: !input sonos_group
       message: "Someone is at the front door"
-      language: en-au
+      language: en-US
 
   # 6. Phone notification (safe pattern)
   - service: notify.notify
