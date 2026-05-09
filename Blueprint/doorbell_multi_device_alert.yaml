@@ -1,8 +1,9 @@
 blueprint:
   name: Doorbell - Multi-Device Alert System (TvOverlay, UI-Safe)
   description: >
-    Sends snapshot, Sonos chime + TTS, phone notification, and TvOverlay
-    notification on the TV when the doorbell is triggered.
+    Sends snapshot, Sonos chime + TTS, phone notification,
+    and TvOverlay notification on the TV when the doorbell is triggered.
+
   domain: automation
 
   input:
@@ -42,6 +43,10 @@ blueprint:
 
     phone_notify_service:
       name: Phone Notify Service
+      description: >
+        Example:
+        notify.mobile_app_pixel_9_pro
+      default: ""
       selector:
         text:
 
@@ -53,6 +58,9 @@ blueprint:
 
     chime_file:
       name: Chime File (optional)
+      description: >
+        Example:
+        media-source://media_source/local/chime.mp3
       default: ""
       selector:
         text:
@@ -72,33 +80,56 @@ trigger:
 
 action:
 
-  # 1. Trigger snapshot
+  #################################################################
+  # 1. Trigger snapshot switch
+  #################################################################
+
   - service: switch.turn_on
     target:
       entity_id: !input snapshot_switch
 
-  - delay: "00:00:04"
+  #################################################################
+  # 2. Wait for camera/snapshot generation
+  #################################################################
+
+  - delay: "00:00:06"
+
+  #################################################################
+  # 3. Save snapshot
+  #################################################################
 
   - service: camera.snapshot
     target:
       entity_id: !input camera_entity
     data:
-      filename: "/media/doorbell/doorbell_snapshot.jpg"
+      filename: "/config/www/temp/doorbell_snapshot.jpg"
 
-  # 2. Variables
+  #################################################################
+  # 4. Variables
+  #################################################################
+
   - variables:
       chime_file_value: !input chime_file
       phone_notify_target: !input phone_notify_service
       enable_tv_overlay_flag: !input enable_tv_overlay
       sonos_entity: !input sonos_group
-      original_sonos_volume: "{{ state_attr(sonos_entity, 'volume_level') }}"
-      image_path: "/media/local/doorbell/doorbell_snapshot.jpg"
 
-  # 3. Optional chime
+      original_sonos_volume: >
+        {{ state_attr(sonos_entity, 'volume_level') | default(0.35) }}
+
+      image_path: >
+        https://nointernet.au/local/temp/doorbell_snapshot.jpg
+
+  #################################################################
+  # 5. Optional chime
+  #################################################################
+
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ chime_file_value | length > 0 }}"
+            value_template: >
+              {{ chime_file_value | default('') | length > 0 }}
+
         sequence:
           - service: media_player.play_media
             target:
@@ -107,14 +138,20 @@ action:
               media_content_id: "{{ chime_file_value }}"
               media_content_type: music
 
-  # 4. Set Sonos volume
+  #################################################################
+  # 6. Set Sonos volume
+  #################################################################
+
   - service: media_player.volume_set
     target:
       entity_id: !input sonos_group
     data:
       volume_level: !input sonos_volume
 
-  # 5. TTS announcement
+  #################################################################
+  # 7. TTS announcement
+  #################################################################
+
   - service: tts.speak
     target:
       entity_id: !input tts_engine
@@ -124,20 +161,28 @@ action:
       message: "Someone is at the front door"
       language: en-US
 
-  # 6. Restore Sonos volume
+  #################################################################
+  # 8. Restore Sonos volume
+  #################################################################
+
   - delay: "00:00:02"
+
   - service: media_player.volume_set
     target:
       entity_id: !input sonos_group
     data:
       volume_level: "{{ original_sonos_volume }}"
 
-  # 7. Phone notification
+  #################################################################
+  # 9. Phone notification
+  #################################################################
+
   - choose:
       - conditions:
           - condition: template
             value_template: >
-              {{ phone_notify_target is string and phone_notify_target | length > 0 }}
+              {{ phone_notify_target | default('') | length > 0 }}
+
         sequence:
           - service: "{{ phone_notify_target }}"
             data:
@@ -146,11 +191,16 @@ action:
               data:
                 image: "{{ image_path }}"
 
-  # 8. TvOverlay notification
+  #################################################################
+  # 10. TvOverlay notification
+  #################################################################
+
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ enable_tv_overlay_flag }}"
+            value_template: >
+              {{ enable_tv_overlay_flag }}
+
         sequence:
           - service: rest_command.tvoverlay_doorbell
             data:
