@@ -145,14 +145,19 @@ action:
       language: en-US
 
   # 6. Phone notification (safe pattern)
+  - variables:
+      phone_notify_target: !input phone_notify_service
+
+# Send phone notification
   - service: notify.notify
     data:
-      target: "{{ inputs.phone_notify_service }}"
+      target: "{{ phone_notify_target }}"
       title: "Front Door Alert"
       message: "Someone is at the front door"
       data:
         image: "{{ snapshot_url }}"
         clickAction: "/our-home/security"
+
 
   # 7. TV image notification
   - choose:
