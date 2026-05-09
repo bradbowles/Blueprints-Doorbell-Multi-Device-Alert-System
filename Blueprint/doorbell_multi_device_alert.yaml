@@ -148,15 +148,17 @@ action:
   - variables:
       phone_notify_target: !input phone_notify_service
 
-# Send phone notification
-  - service: notify.notify
-    data:
-      target: "{{ phone_notify_target }}"
-      title: "Front Door Alert"
-      message: "Someone is at the front door"
-      data:
-        image: "{{ snapshot_url }}"
-        clickAction: "/our-home/security"
+  # Call the phone notify service dynamically
+  - choose:
+      - conditions: "{{ phone_notify_service is string }}"
+        sequence:
+          - service: "{{ phone_notify_service }}"
+            data:
+              title: "Front Door Alert"
+              message: "Someone is at the front door"
+              data:
+                image: "{{ snapshot_url }}"
+                clickAction: "/our-home/security"
 
 
   # 7. TV image notification
