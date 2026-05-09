@@ -1,5 +1,5 @@
 blueprint:
-  name: Doorbell - Multi-Device Alert System (TvOverlay)
+  name: Doorbell - Multi-Device Alert System (TvOverlay, UI-Safe)
   description: >
     Sends snapshot, Sonos chime + TTS, phone notification, and TvOverlay
     notification on the TV when the doorbell is triggered.
@@ -32,7 +32,6 @@ blueprint:
 
     sonos_volume:
       name: Sonos Volume
-      description: Set the volume level for the announcement.
       default: 0.35
       selector:
         number:
@@ -43,7 +42,6 @@ blueprint:
 
     phone_notify_service:
       name: Phone Notify Service
-      description: e.g. notify.mobile_app_brads_fold_6
       selector:
         text:
 
@@ -54,7 +52,7 @@ blueprint:
           domain: tts
 
     chime_file:
-      name: Chime File (optional, /media or /local path)
+      name: Chime File (optional)
       default: ""
       selector:
         text:
@@ -87,18 +85,20 @@ action:
     data:
       filename: "/media/doorbell/doorbell_snapshot.jpg"
 
-  # 2. Variables (single safe block)
+  # 2. Variables
   - variables:
       chime_file_value: !input chime_file
       phone_notify_target: !input phone_notify_service
-      enable_tv_overlay: !input enable_tv_overlay
+      enable_tv_overlay_flag: !input enable_tv_overlay
       sonos_entity: !input sonos_group
       original_sonos_volume: "{{ state_attr(sonos_entity, 'volume_level') }}"
       image_path: "/media/local/doorbell/doorbell_snapshot.jpg"
 
   # 3. Optional chime
   - choose:
-      - conditions: "{{ chime_file_value | length > 0 }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ chime_file_value | length > 0 }}"
         sequence:
           - service: media_player.play_media
             target:
@@ -107,14 +107,14 @@ action:
               media_content_id: "{{ chime_file_value }}"
               media_content_type: music
 
-  # 4. Set Sonos volume for announcement
+  # 4. Set Sonos volume
   - service: media_player.volume_set
     target:
       entity_id: !input sonos_group
     data:
       volume_level: !input sonos_volume
 
-  # 5. Sonos TTS announcement
+  # 5. TTS announcement
   - service: tts.speak
     target:
       entity_id: !input tts_engine
@@ -124,7 +124,7 @@ action:
       message: "Someone is at the front door"
       language: en-US
 
-  # 6. Restore original Sonos volume
+  # 6. Restore Sonos volume
   - delay: "00:00:02"
   - service: media_player.volume_set
     target:
@@ -134,7 +134,10 @@ action:
 
   # 7. Phone notification
   - choose:
-      - conditions: "{{ phone_notify_target is string and phone_notify_target | length > 0 }}"
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ phone_notify_target is string and phone_notify_target | length > 0 }}
         sequence:
           - service: "{{ phone_notify_target }}"
             data:
@@ -147,7 +150,7 @@ action:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ enable_tv_overlay }}"
+            value_template: "{{ enable_tv_overlay_flag }}"
         sequence:
           - service: rest_command.tvoverlay_doorbell
             data:
