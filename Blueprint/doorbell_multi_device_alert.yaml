@@ -5,15 +5,26 @@ blueprint:
     notification, and optional TV overlay notification with adjustable display
     duration when the doorbell is triggered by ding, motion, or person detection.
     Includes a dynamic pause condition using Home Assistant's native condition selector.
-    v2.1.3 adds dynamic snapshot URL, cache-busting, safe TTS volume restore,
-    continue_on_error for TTS and TV overlay, and improved snapshot timing.
+    v2.1.3 adds dynamic snapshot URL via base_url input, cache-busting, safe TTS volume
+    restore, continue_on_error for TTS and TV overlay, and improved snapshot timing.
 
   domain: automation
 
   input:
 
     #################################################################
-    # 0. Pause Logic
+    # 0. Base URL (NEW in v2.1.3)
+    #################################################################
+
+    base_url:
+      name: Home Assistant Base URL
+      description: "Example: http://homeassistant.local:8123"
+      default: "http://homeassistant.local:8123"
+      selector:
+        text:
+
+    #################################################################
+    # 1. Pause Logic
     #################################################################
 
     pause_condition:
@@ -23,7 +34,7 @@ blueprint:
         condition:
 
     #################################################################
-    # 1. Trigger Inputs (Ding, Motion, Person)
+    # 2. Trigger Inputs (Ding, Motion, Person)
     #################################################################
 
     doorbell_trigger:
@@ -54,7 +65,7 @@ blueprint:
           domain: binary_sensor
 
     #################################################################
-    # 2. Snapshot Inputs
+    # 3. Snapshot Inputs
     #################################################################
 
     snapshot_switch:
@@ -70,7 +81,7 @@ blueprint:
           domain: camera
 
     #################################################################
-    # 3. Speaker Announcement
+    # 4. Speaker Announcement
     #################################################################
 
     speaker_enable:
@@ -123,7 +134,7 @@ blueprint:
           multiline: true
 
     #################################################################
-    # 4. Phone Notification
+    # 5. Phone Notification
     #################################################################
 
     phone_enable:
@@ -159,7 +170,7 @@ blueprint:
         boolean:
 
     #################################################################
-    # 5. TV Overlay
+    # 6. TV Overlay
     #################################################################
 
     tv_enable:
@@ -250,6 +261,8 @@ action:
   #################################################################
 
   - variables:
+      base_url: !input base_url
+
       speaker_enable_flag: !input speaker_enable
       speaker_targets_list: !input speaker_targets
       speaker_tts_engine_entity: !input speaker_tts_engine
@@ -286,11 +299,9 @@ action:
           0.35
         {% endif %}
 
-      # ⭐ Dynamic snapshot URL with cache-buster
+      # ⭐ Dynamic snapshot URL with cache-buster (NO hass reference)
       image_path: >
-        {{ (hass.config.external_url or hass.config.internal_url)
-           ~ '/local/temp/doorbell_snapshot.jpg?'
-           ~ now().timestamp() }}
+        {{ base_url ~ '/local/temp/doorbell_snapshot.jpg?' ~ now().timestamp() }}
 
   #################################################################
   # 5. Speaker Announcement (Single-shot TTS)
