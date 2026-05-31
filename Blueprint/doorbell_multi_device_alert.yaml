@@ -1,10 +1,10 @@
 blueprint:
-  name: Doorbell - Multi Device Alert System
+  name: Doorbell - Multi Device Alert System (v2.1.0)
   description: >
-    Sends snapshot, optional speaker chime and TTS with smart retry, optional
-    phone notification, and optional TV overlay notification when the doorbell
-    is triggered. Includes a dynamic pause condition using Home Assistant's
-    native condition selector.
+    Sends snapshot, optional speaker chime and TTS with smart retry and adjustable cooldown,
+    optional phone notification, and optional TV overlay notification with adjustable display
+    duration when the doorbell is triggered. Includes a dynamic pause condition using Home
+    Assistant's native condition selector.
 
   domain: automation
 
@@ -117,6 +117,18 @@ blueprint:
         text:
           multiline: true
 
+    tts_retry_cooldown:
+      name: Speaker - TTS retry cooldown (seconds)
+      description: >
+        Time to wait between TTS retry attempts if the first attempt did not start playback.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 1
+          mode: slider
+
     #################################################################
     # 3. Phone Notification
     #################################################################
@@ -132,7 +144,7 @@ blueprint:
     phone_notify_service:
       name: Phone - Notify service
       description: >
-        The notify service for your phone.
+        The notify service for your phone (e.g. notify.mobile_app_xxx).
       default: ""
       selector:
         text:
@@ -192,6 +204,18 @@ blueprint:
       selector:
         boolean:
 
+    tv_duration:
+      name: TV - Display duration (seconds)
+      description: >
+        How long the TV overlay should remain visible.
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          mode: slider
+
 mode: single
 
 trigger:
@@ -219,7 +243,7 @@ action:
       entity_id: !input snapshot_switch
 
   #################################################################
-  # 2. Wait for snapshot
+  # 2. Wait for snapshot routine
   #################################################################
 
   - delay: 00:00:06
@@ -246,6 +270,7 @@ action:
       speaker_volume_value: !input speaker_volume
       speaker_chime_enable_flag: !input speaker_chime_enable
       speaker_chime_file_value: !input speaker_chime_file
+      tts_retry_cooldown_value: !input tts_retry_cooldown
 
       phone_enable_flag: !input phone_enable
       phone_notify_target: !input phone_notify_service
@@ -256,6 +281,7 @@ action:
       tv_enable_flag: !input tv_enable
       tv_caption_value: !input tv_caption
       tv_include_snapshot_flag: !input tv_include_snapshot
+      tv_duration_value: !input tv_duration
 
       primary_speaker: >
         {% set s = speaker_targets_list %}
@@ -308,7 +334,7 @@ action:
             data:
               volume_level: "{{ speaker_volume_value }}"
 
-          # TTS with smart retry
+          # TTS with smart retry and adjustable cooldown
           - repeat:
               count: 2
               sequence:
@@ -322,8 +348,10 @@ action:
                     message: "{{ speaker_tts_message_value }}"
                     language: en-US
 
+                # Give the speaker time to start playback
                 - delay: 00:00:03
 
+                # Stop retrying if the speaker is active
                 - choose:
                     - conditions:
                         - condition: template
@@ -335,6 +363,12 @@ action:
                             ] }}
                       sequence:
                         - stop: TTS succeeded
+
+                # Cooldown before next retry (only matters if previous attempt failed)
+                - delay:
+                    hours: 0
+                    minutes: 0
+                    seconds: "{{ tts_retry_cooldown_value | int }}"
 
           # Restore volume
           - delay: 00:00:02
@@ -386,6 +420,9 @@ action:
             value_template: "{{ tv_enable_flag }}"
         sequence:
 
+          # Small delay to ensure snapshot is fully written
+          - delay: 00:00:01
+
           # With snapshot
           - choose:
               - conditions:
@@ -396,6 +433,7 @@ action:
                     data:
                       caption: "{{ tv_caption_value }}"
                       image_path: "{{ image_path }}"
+                      duration: "{{ tv_duration_value | int }}"
 
             # Without snapshot
             default:
@@ -403,3 +441,4 @@ action:
                 data:
                   caption: "{{ tv_caption_value }}"
                   image_path: ""
+                  duration: "{{ tv_duration_value | int }}"
