@@ -1,10 +1,10 @@
 blueprint:
-  name: Doorbell - Multi-Device Alert System (TvOverlay, UI-Safe)
+  name: Doorbell - Multi Device Alert System
   description: >
-    Sends snapshot, optional speaker chime + TTS (with retry), optional phone
-    notification, and optional TvOverlay notification on the TV when the
-    doorbell is triggered. Includes a dynamic pause condition using Home
-    Assistant's native condition selector.
+    Sends snapshot, optional speaker chime and TTS with retry, optional phone
+    notification, and optional TV overlay notification when the doorbell is
+    triggered. Includes a dynamic pause condition using Home Assistant's
+    native condition selector.
 
   domain: automation
 
@@ -15,21 +15,20 @@ blueprint:
     #################################################################
 
     pause_condition:
-      name: "Pause: Condition to pause automation"
+      name: Pause - Condition to pause automation
       description: >
         If this condition evaluates to true, the automation will be skipped.
-        You can use any combination of conditions (state, device, zone,
-        numeric, time, template, etc.).
+        You can use any combination of conditions.
       default: []
       selector:
         condition:
 
     #################################################################
-    # 1. Doorbell & Snapshot Inputs
+    # 1. Doorbell and Snapshot Inputs
     #################################################################
 
     doorbell_trigger:
-      name: "Doorbell: Trigger sensor"
+      name: Doorbell - Trigger sensor
       description: >
         The binary sensor that represents your doorbell ding event.
       selector:
@@ -37,7 +36,7 @@ blueprint:
           domain: binary_sensor
 
     snapshot_switch:
-      name: "Snapshot: Trigger switch"
+      name: Snapshot - Trigger switch
       description: >
         A switch or helper that triggers your camera snapshot routine.
       selector:
@@ -45,7 +44,7 @@ blueprint:
           domain: switch
 
     camera_entity:
-      name: "Snapshot: Camera entity"
+      name: Snapshot - Camera entity
       description: >
         The camera entity used to capture the snapshot.
       selector:
@@ -53,11 +52,11 @@ blueprint:
           domain: camera
 
     #################################################################
-    # 2. Speaker Announcement (Optional)
+    # 2. Speaker Announcement
     #################################################################
 
     speaker_enable:
-      name: "Speaker: Enable announcement"
+      name: Speaker - Enable announcement
       description: >
         Enable a spoken announcement on one or more media players.
       default: true
@@ -65,7 +64,7 @@ blueprint:
         boolean:
 
     speaker_targets:
-      name: "Speaker: Media players"
+      name: Speaker - Media players
       description: >
         One or more media players that will play the chime and TTS message.
       selector:
@@ -74,7 +73,7 @@ blueprint:
           multiple: true
 
     speaker_tts_engine:
-      name: "Speaker: TTS engine"
+      name: Speaker - TTS engine
       description: >
         The TTS engine to use for the spoken announcement.
       selector:
@@ -82,16 +81,16 @@ blueprint:
           domain: tts
 
     speaker_tts_message:
-      name: "Speaker: TTS message"
+      name: Speaker - TTS message
       description: >
         The text that will be spoken. Templating is allowed.
-      default: "Someone is at the front door"
+      default: Someone is at the front door
       selector:
         text:
           multiline: true
 
     speaker_volume:
-      name: "Speaker: Volume level"
+      name: Speaker - Volume level
       description: >
         Temporary volume level to set during the announcement.
       default: 0.35
@@ -103,7 +102,7 @@ blueprint:
           mode: slider
 
     speaker_chime_enable:
-      name: "Speaker: Enable chime"
+      name: Speaker - Enable chime
       description: >
         Play a chime sound before the TTS message.
       default: false
@@ -111,7 +110,7 @@ blueprint:
         boolean:
 
     speaker_chime_file:
-      name: "Speaker: Chime file"
+      name: Speaker - Chime file
       description: >
         Media file to play as a chime. Templating allowed.
       default: ""
@@ -120,11 +119,11 @@ blueprint:
           multiline: true
 
     #################################################################
-    # 3. Phone Notification (Optional)
+    # 3. Phone Notification
     #################################################################
 
     phone_enable:
-      name: "Phone: Enable notification"
+      name: Phone - Enable notification
       description: >
         Send a notification to your phone when the doorbell is pressed.
       default: true
@@ -132,7 +131,7 @@ blueprint:
         boolean:
 
     phone_notify_service:
-      name: "Phone: Notify service"
+      name: Phone - Notify service
       description: >
         The notify service for your phone.
       default: ""
@@ -140,25 +139,25 @@ blueprint:
         text:
 
     phone_title:
-      name: "Phone: Notification title"
+      name: Phone - Notification title
       description: >
         Title of the phone notification. Templating allowed.
-      default: "Front Door Alert"
+      default: Front Door Alert
       selector:
         text:
           multiline: true
 
     phone_message:
-      name: "Phone: Notification message"
+      name: Phone - Notification message
       description: >
         Body of the phone notification. Templating allowed.
-      default: "Someone is at the front door"
+      default: Someone is at the front door
       selector:
         text:
           multiline: true
 
     phone_include_snapshot:
-      name: "Phone: Include snapshot"
+      name: Phone - Include snapshot
       description: >
         Attach the snapshot image to the phone notification.
       default: true
@@ -166,28 +165,28 @@ blueprint:
         boolean:
 
     #################################################################
-    # 4. TV Overlay (Optional)
+    # 4. TV Overlay
     #################################################################
 
     tv_enable:
-      name: "TV: Enable overlay"
+      name: TV - Enable overlay
       description: >
-        Send a TvOverlay notification to supported TVs.
+        Send a TV overlay notification to supported TVs.
       default: true
       selector:
         boolean:
 
     tv_caption:
-      name: "TV: Caption"
+      name: TV - Caption
       description: >
         Caption text to display on the TV overlay. Templating allowed.
-      default: "Someone is at the front door"
+      default: Someone is at the front door
       selector:
         text:
           multiline: true
 
     tv_include_snapshot:
-      name: "TV: Include snapshot"
+      name: TV - Include snapshot
       description: >
         Include the snapshot image in the TV overlay.
       default: true
@@ -210,7 +209,7 @@ action:
   - choose:
       - conditions: !input pause_condition
         sequence:
-          - stop: "Automation paused because the pause condition matched."
+          - stop: Automation paused because the pause condition matched.
 
   #################################################################
   # 1. Trigger snapshot switch
@@ -224,7 +223,7 @@ action:
   # 2. Wait for snapshot
   #################################################################
 
-  - delay: "00:00:06"
+  - delay: 00:00:06
 
   #################################################################
   # 3. Save snapshot
@@ -234,7 +233,7 @@ action:
     target:
       entity_id: !input camera_entity
     data:
-      filename: "/config/www/temp/doorbell_snapshot.jpg"
+      filename: /config/www/temp/doorbell_snapshot.jpg
 
   #################################################################
   # 4. Variables
@@ -266,12 +265,12 @@ action:
         {% elif s is iterable and s | length > 0 %}
           {{ s[0] }}
         {% else %}
-          {{ '' }}
+          {{ "" }}
         {% endif %}
 
       original_speaker_volume: >
-        {% if primary_speaker != '' %}
-          {{ state_attr(primary_speaker, 'volume_level') | default(0.35) }}
+        {% if primary_speaker != "" %}
+          {{ state_attr(primary_speaker, "volume_level") | default(0.35) }}
         {% else %}
           0.35
         {% endif %}
@@ -324,17 +323,17 @@ action:
                     message: "{{ speaker_tts_message_value }}"
                     language: en-US
 
-                - delay: "00:00:01.5"
+                - delay: 00:00:01.5
 
                 - choose:
                     - conditions:
                         - condition: template
                           value_template: "{{ is_state(primary_speaker, 'playing') }}"
                       sequence:
-                        - stop: "TTS succeeded"
+                        - stop: TTS succeeded
 
           # Restore volume
-          - delay: "00:00:02"
+          - delay: 00:00:02
 
           - service: media_player.volume_set
             target:
