@@ -1,10 +1,10 @@
 blueprint:
-  name: Doorbell - Multi Device Alert System (v2.1.0)
+  name: Doorbell - Multi Device Alert System (v2.1.1)
   description: >
-    Sends snapshot, optional speaker chime and TTS with smart retry and adjustable cooldown,
-    optional phone notification, and optional TV overlay notification with adjustable display
-    duration when the doorbell is triggered. Includes a dynamic pause condition using Home
-    Assistant's native condition selector.
+    Sends snapshot, optional speaker chime and single-shot TTS, optional phone
+    notification, and optional TV overlay notification with adjustable display
+    duration when the doorbell is triggered. Includes a dynamic pause condition
+    using Home Assistant's native condition selector.
 
   domain: automation
 
@@ -28,24 +28,18 @@ blueprint:
 
     doorbell_trigger:
       name: Doorbell - Trigger sensor
-      description: >
-        The binary sensor that represents your doorbell ding event.
       selector:
         entity:
           domain: binary_sensor
 
     snapshot_switch:
       name: Snapshot - Trigger switch
-      description: >
-        A switch or helper that triggers your camera snapshot routine.
       selector:
         entity:
           domain: switch
 
     camera_entity:
       name: Snapshot - Camera entity
-      description: >
-        The camera entity used to capture the snapshot.
       selector:
         entity:
           domain: camera
@@ -56,16 +50,12 @@ blueprint:
 
     speaker_enable:
       name: Speaker - Enable announcement
-      description: >
-        Enable a spoken announcement on one or more media players.
       default: true
       selector:
         boolean:
 
     speaker_targets:
       name: Speaker - Media players
-      description: >
-        One or more media players that will play the chime and TTS message.
       selector:
         entity:
           domain: media_player
@@ -73,16 +63,12 @@ blueprint:
 
     speaker_tts_engine:
       name: Speaker - TTS engine
-      description: >
-        The TTS engine to use for the spoken announcement.
       selector:
         entity:
           domain: tts
 
     speaker_tts_message:
       name: Speaker - TTS message
-      description: >
-        The text that will be spoken. Templating is allowed.
       default: Someone is at the front door
       selector:
         text:
@@ -90,8 +76,6 @@ blueprint:
 
     speaker_volume:
       name: Speaker - Volume level
-      description: >
-        Temporary volume level to set during the announcement.
       default: 0.35
       selector:
         number:
@@ -102,32 +86,16 @@ blueprint:
 
     speaker_chime_enable:
       name: Speaker - Enable chime
-      description: >
-        Play a chime sound before the TTS message.
       default: false
       selector:
         boolean:
 
     speaker_chime_file:
       name: Speaker - Chime file
-      description: >
-        Media file to play as a chime. Templating allowed.
       default: ""
       selector:
         text:
           multiline: true
-
-    tts_retry_cooldown:
-      name: Speaker - TTS retry cooldown (seconds)
-      description: >
-        Time to wait between TTS retry attempts if the first attempt did not start playback.
-      default: 5
-      selector:
-        number:
-          min: 1
-          max: 30
-          step: 1
-          mode: slider
 
     #################################################################
     # 3. Phone Notification
@@ -135,24 +103,18 @@ blueprint:
 
     phone_enable:
       name: Phone - Enable notification
-      description: >
-        Send a notification to your phone when the doorbell is pressed.
       default: true
       selector:
         boolean:
 
     phone_notify_service:
       name: Phone - Notify service
-      description: >
-        The notify service for your phone (e.g. notify.mobile_app_xxx).
       default: ""
       selector:
         text:
 
     phone_title:
       name: Phone - Notification title
-      description: >
-        Title of the phone notification. Templating allowed.
       default: Front Door Alert
       selector:
         text:
@@ -160,8 +122,6 @@ blueprint:
 
     phone_message:
       name: Phone - Notification message
-      description: >
-        Body of the phone notification. Templating allowed.
       default: Someone is at the front door
       selector:
         text:
@@ -169,8 +129,6 @@ blueprint:
 
     phone_include_snapshot:
       name: Phone - Include snapshot
-      description: >
-        Attach the snapshot image to the phone notification.
       default: true
       selector:
         boolean:
@@ -181,16 +139,12 @@ blueprint:
 
     tv_enable:
       name: TV - Enable overlay
-      description: >
-        Send a TV overlay notification to supported TVs.
       default: true
       selector:
         boolean:
 
     tv_caption:
       name: TV - Caption
-      description: >
-        Caption text to display on the TV overlay. Templating allowed.
       default: Someone is at the front door
       selector:
         text:
@@ -198,16 +152,12 @@ blueprint:
 
     tv_include_snapshot:
       name: TV - Include snapshot
-      description: >
-        Include the snapshot image in the TV overlay.
       default: true
       selector:
         boolean:
 
     tv_duration:
       name: TV - Display duration (seconds)
-      description: >
-        How long the TV overlay should remain visible.
       default: 10
       selector:
         number:
@@ -270,7 +220,6 @@ action:
       speaker_volume_value: !input speaker_volume
       speaker_chime_enable_flag: !input speaker_chime_enable
       speaker_chime_file_value: !input speaker_chime_file
-      tts_retry_cooldown_value: !input tts_retry_cooldown
 
       phone_enable_flag: !input phone_enable
       phone_notify_target: !input phone_notify_service
@@ -304,7 +253,7 @@ action:
         http://192.168.20.10:8123/local/temp/doorbell_snapshot.jpg
 
   #################################################################
-  # 5. Speaker Announcement
+  # 5. Speaker Announcement (Single-shot TTS)
   #################################################################
 
   - choose:
@@ -327,52 +276,27 @@ action:
                       media_content_id: "{{ speaker_chime_file_value }}"
                       media_content_type: music
 
-          # Set volume
+          # Set temporary volume
           - service: media_player.volume_set
             target:
               entity_id: "{{ speaker_targets_list }}"
             data:
               volume_level: "{{ speaker_volume_value }}"
 
-          # TTS with smart retry and adjustable cooldown
-          - repeat:
-              count: 2
-              sequence:
+          # Single TTS attempt
+          - service: tts.speak
+            target:
+              entity_id: "{{ speaker_tts_engine_entity }}"
+            data:
+              cache: true
+              media_player_entity_id: "{{ speaker_targets_list }}"
+              message: "{{ speaker_tts_message_value }}"
+              language: en-US
 
-                - service: tts.speak
-                  target:
-                    entity_id: "{{ speaker_tts_engine_entity }}"
-                  data:
-                    cache: true
-                    media_player_entity_id: "{{ speaker_targets_list }}"
-                    message: "{{ speaker_tts_message_value }}"
-                    language: en-US
+          # Allow playback to start before restoring volume
+          - delay: 00:00:03
 
-                # Give the speaker time to start playback
-                - delay: 00:00:03
-
-                # Stop retrying if the speaker is active
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: >
-                            {{ states(primary_speaker) in [
-                              'playing',
-                              'buffering',
-                              'transitioning'
-                            ] }}
-                      sequence:
-                        - stop: TTS succeeded
-
-                # Cooldown before next retry (only matters if previous attempt failed)
-                - delay:
-                    hours: 0
-                    minutes: 0
-                    seconds: "{{ tts_retry_cooldown_value | int }}"
-
-          # Restore volume
-          - delay: 00:00:02
-
+          # Restore original volume
           - service: media_player.volume_set
             target:
               entity_id: "{{ speaker_targets_list }}"
