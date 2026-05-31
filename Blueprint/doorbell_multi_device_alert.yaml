@@ -102,7 +102,7 @@ blueprint:
           multiline: true
       visible: "{{ enable_speaker }}"
 
-    sonos_volume:
+    speaker_volume:
       name: Speaker volume
       description: >
         Temporary volume level to set on the speakers during the announcement.
@@ -119,7 +119,7 @@ blueprint:
     enable_chime:
       name: Enable chime before TTS
       description: >
-        Play a chime sound on the speakers before the TTS announcement.
+        Play a chime sound on the speakers before the TTS message.
       default: false
       selector:
         boolean:
@@ -157,7 +157,6 @@ blueprint:
       default: ""
       selector:
         text:
-          multiline: false
       visible: "{{ enable_phone }}"
 
     phone_title:
@@ -275,7 +274,6 @@ action:
   #################################################################
 
   - variables:
-      # Core inputs
       enable_speaker_flag: !input enable_speaker
       enable_phone_flag: !input enable_phone
       enable_tv_overlay_flag: !input enable_tv_overlay
@@ -283,7 +281,7 @@ action:
       speaker_targets: !input speaker_targets
       tts_engine_entity: !input tts_engine
       tts_message_value: !input tts_message
-      speaker_volume_value: !input sonos_volume
+      speaker_volume_value: !input speaker_volume
 
       enable_chime_flag: !input enable_chime
       chime_file_value: !input chime_file
@@ -296,7 +294,6 @@ action:
       overlay_caption_value: !input overlay_caption
       include_snapshot_tv_flag: !input include_snapshot_tv
 
-      # Derive primary speaker for retry logic (first in list)
       primary_speaker: >
         {% set s = speaker_targets %}
         {% if s is string %}
@@ -307,7 +304,6 @@ action:
           {{ '' }}
         {% endif %}
 
-      # Original volume of primary speaker (fallback to 0.35)
       original_speaker_volume: >
         {% if primary_speaker != '' %}
           {{ state_attr(primary_speaker, 'volume_level') | default(0.35) }}
@@ -315,12 +311,11 @@ action:
           0.35
         {% endif %}
 
-      # Snapshot URL (adjust to your external URL if needed)
       image_path: >
         https://nointernet.au/local/temp/doorbell_snapshot.jpg
 
   #################################################################
-  # 5. Speaker Announcement (Optional: Chime + TTS with Retry)
+  # 5. Speaker Announcement (Optional)
   #################################################################
 
   - choose:
@@ -393,14 +388,26 @@ action:
             value_template: >
               {{ enable_phone_flag and phone_notify_target | default('') | length > 0 }}
         sequence:
-          - service: "{{ phone_notify_target }}"
-            data:
-              title: "{{ phone_title_value }}"
-              message: "{{ phone_message_value }}"
-              {% if include_snapshot_phone_flag %}
-              data:
-                image: "{{ image_path }}"
-              {% endif %}
+
+          # With snapshot
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ include_snapshot_phone_flag }}"
+                sequence:
+                  - service: "{{ phone_notify_target }}"
+                    data:
+                      title: "{{ phone_title_value }}"
+                      message: "{{ phone_message_value }}"
+                      data:
+                        image: "{{ image_path }}"
+
+            # Without snapshot
+            default:
+              - service: "{{ phone_notify_target }}"
+                data:
+                  title: "{{ phone_title_value }}"
+                  message: "{{ phone_message_value }}"
 
   #################################################################
   # 7. TvOverlay Notification (Optional)
@@ -411,7 +418,21 @@ action:
           - condition: template
             value_template: "{{ enable_tv_overlay_flag }}"
         sequence:
-          - service: rest_command.tvoverlay_doorbell
-            data:
-              image_path: "{{ image_path if include_snapshot_tv_flag else '' }}"
-              caption: "{{ overlay_caption_value }}"
+
+          # With snapshot
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ include_snapshot_tv_flag }}"
+                sequence:
+                  - service: rest_command.tvoverlay_doorbell
+                    data:
+                      caption: "{{ overlay_caption_value }}"
+                      image_path: "{{ image_path }}"
+
+            # Without snapshot
+            default:
+              - service: rest_command.tvoverlay_doorbell
+                data:
+                  caption: "{{ overlay_caption_value }}"
+                  image_path: ""
