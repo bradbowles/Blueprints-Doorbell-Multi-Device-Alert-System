@@ -1,10 +1,10 @@
 blueprint:
   name: Doorbell - Multi-Device Alert System (TvOverlay, UI-Safe)
   description: >
-    Sends snapshot, Sonos chime + TTS (with retry), phone notification,
-    and TvOverlay notification on the TV when the doorbell is triggered.
-    Includes a dynamic pause condition using Home Assistant's native
-    condition selector.
+    Sends snapshot, optional speaker chime + TTS (with retry), optional phone
+    notification, and optional TvOverlay notification on the TV when the
+    doorbell is triggered. Includes a dynamic pause condition using Home
+    Assistant's native condition selector.
 
   domain: automation
 
@@ -20,40 +20,93 @@ blueprint:
         If this condition evaluates to true, the automation will be skipped.
         You can use any combination of conditions (state, device, zone,
         numeric, time, template, etc.).
+        Example: "Front door is open" OR "Garage door is open".
       default: []
       selector:
         condition:
 
     #################################################################
-    # 1. Doorbell Inputs
+    # 1. Doorbell & Snapshot Inputs
     #################################################################
 
     doorbell_trigger:
       name: Doorbell Trigger (ding)
+      description: >
+        The binary sensor that represents your doorbell "ding" event.
+        Example: binary_sensor.front_door_ding.
       selector:
         entity:
           domain: binary_sensor
 
     snapshot_switch:
       name: Snapshot Trigger Switch
+      description: >
+        A switch or helper that triggers your camera snapshot routine.
+        Example: switch.doorbell_snapshot_trigger.
       selector:
         entity:
           domain: switch
 
     camera_entity:
       name: Doorbell Camera
+      description: >
+        The camera entity used to capture the snapshot.
+        Example: camera.front_door.
       selector:
         entity:
           domain: camera
 
-    sonos_group:
-      name: Sonos Group
+    #################################################################
+    # 2. Speaker Announcement (Optional)
+    #################################################################
+
+    enable_speaker:
+      name: Enable speaker announcement
+      description: >
+        Enable a spoken announcement on one or more media players when the
+        doorbell is pressed.
+      default: true
+      selector:
+        boolean:
+
+    speaker_targets:
+      name: Speaker media players
+      description: >
+        One or more media players that will play the chime and TTS message.
+        Example: media_player.sonos_living_room, media_player.kitchen_speaker.
       selector:
         entity:
           domain: media_player
+          multiple: true
+      visible: "{{ enable_speaker }}"
+
+    tts_engine:
+      name: TTS Engine
+      description: >
+        The TTS engine to use for the spoken announcement.
+        Example: tts.google_cloud, tts.google_translate.
+      selector:
+        entity:
+          domain: tts
+      visible: "{{ enable_speaker }}"
+
+    tts_message:
+      name: TTS message (templated)
+      description: >
+        The text that will be spoken on your speakers. Templating is allowed.
+        Example: "Someone is at the front door" or
+        "{{ now().strftime('%H:%M') }} - Someone is at the front door".
+      default: "Someone is at the front door"
+      selector:
+        text:
+          multiline: true
+      visible: "{{ enable_speaker }}"
 
     sonos_volume:
-      name: Sonos Volume
+      name: Speaker volume
+      description: >
+        Temporary volume level to set on the speakers during the announcement.
+        Example: 0.35.
       default: 0.35
       selector:
         number:
@@ -61,36 +114,119 @@ blueprint:
           max: 1
           step: 0.01
           mode: slider
+      visible: "{{ enable_speaker }}"
 
-    phone_notify_service:
-      name: Phone Notify Service
+    enable_chime:
+      name: Enable chime before TTS
       description: >
-        Example:
-        notify.mobile_app_pixel_9_pro
-      default: ""
+        Play a chime sound on the speakers before the TTS announcement.
+      default: false
       selector:
-        text:
-
-    tts_engine:
-      name: TTS Engine
-      selector:
-        entity:
-          domain: tts
+        boolean:
+      visible: "{{ enable_speaker }}"
 
     chime_file:
-      name: Chime File (optional)
+      name: Chime file (optional, templated)
       description: >
-        Example:
+        Media file to play as a chime before the TTS message. Templating is
+        allowed. Example:
         media-source://media_source/local/chime.mp3
       default: ""
       selector:
         text:
+          multiline: true
+      visible: "{{ enable_speaker }}"
 
-    enable_tv_overlay:
-      name: Enable TvOverlay notification
+    #################################################################
+    # 3. Phone Notification (Optional)
+    #################################################################
+
+    enable_phone:
+      name: Enable phone notification
+      description: >
+        Send a notification to your phone when the doorbell is pressed.
       default: true
       selector:
         boolean:
+
+    phone_notify_service:
+      name: Phone notify service
+      description: >
+        The notify service for your phone. Example:
+        notify.mobile_app_pixel_9_pro or notify.mobile_app_brads_fold_6.
+      default: ""
+      selector:
+        text:
+          multiline: false
+      visible: "{{ enable_phone }}"
+
+    phone_title:
+      name: Phone notification title (templated)
+      description: >
+        Title of the phone notification. Templating is allowed.
+        Example: "Front Door Alert".
+      default: "Front Door Alert"
+      selector:
+        text:
+          multiline: true
+      visible: "{{ enable_phone }}"
+
+    phone_message:
+      name: Phone notification message (templated)
+      description: >
+        Body of the phone notification. Templating is allowed.
+        Example: "Someone is at the front door" or
+        "{{ now().strftime('%H:%M') }} - Someone is at the front door".
+      default: "Someone is at the front door"
+      selector:
+        text:
+          multiline: true
+      visible: "{{ enable_phone }}"
+
+    include_snapshot_phone:
+      name: Include snapshot in phone notification
+      description: >
+        Attach the captured snapshot image to the phone notification (if
+        supported by your notify service).
+      default: true
+      selector:
+        boolean:
+      visible: "{{ enable_phone }}"
+
+    #################################################################
+    # 4. TV Overlay (Optional)
+    #################################################################
+
+    enable_tv_overlay:
+      name: Enable TvOverlay notification
+      description: >
+        Send a TvOverlay notification (via rest_command.tvoverlay_doorbell)
+        to supported TVs when the doorbell is pressed.
+      default: true
+      selector:
+        boolean:
+
+    overlay_caption:
+      name: TV overlay caption (templated)
+      description: >
+        Caption text to display on the TV overlay. Templating is allowed.
+        Example: "Someone is at the front door" or
+        "{{ now().strftime('%H:%M') }} - Doorbell".
+      default: "Someone is at the front door"
+      selector:
+        text:
+          multiline: true
+      visible: "{{ enable_tv_overlay }}"
+
+    include_snapshot_tv:
+      name: Include snapshot in TV overlay
+      description: >
+        Include the captured snapshot image in the TvOverlay notification
+        (if your overlay implementation supports it).
+      default: true
+      selector:
+        boolean:
+      visible: "{{ enable_tv_overlay }}"
 
 mode: single
 
@@ -139,110 +275,143 @@ action:
   #################################################################
 
   - variables:
-      chime_file_value: !input chime_file
-      phone_notify_target: !input phone_notify_service
+      # Core inputs
+      enable_speaker_flag: !input enable_speaker
+      enable_phone_flag: !input enable_phone
       enable_tv_overlay_flag: !input enable_tv_overlay
-      sonos_entity: !input sonos_group
 
-      original_sonos_volume: >
-        {{ state_attr(sonos_entity, 'volume_level') | default(0.35) }}
+      speaker_targets: !input speaker_targets
+      tts_engine_entity: !input tts_engine
+      tts_message_value: !input tts_message
+      speaker_volume_value: !input sonos_volume
 
+      enable_chime_flag: !input enable_chime
+      chime_file_value: !input chime_file
+
+      phone_notify_target: !input phone_notify_service
+      phone_title_value: !input phone_title
+      phone_message_value: !input phone_message
+      include_snapshot_phone_flag: !input include_snapshot_phone
+
+      overlay_caption_value: !input overlay_caption
+      include_snapshot_tv_flag: !input include_snapshot_tv
+
+      # Derive primary speaker for retry logic (first in list)
+      primary_speaker: >
+        {% set s = speaker_targets %}
+        {% if s is string %}
+          {{ s }}
+        {% elif s is iterable and s | length > 0 %}
+          {{ s[0] }}
+        {% else %}
+          {{ '' }}
+        {% endif %}
+
+      # Original volume of primary speaker (fallback to 0.35)
+      original_speaker_volume: >
+        {% if primary_speaker != '' %}
+          {{ state_attr(primary_speaker, 'volume_level') | default(0.35) }}
+        {% else %}
+          0.35
+        {% endif %}
+
+      # Snapshot URL (adjust to your external URL if needed)
       image_path: >
         https://nointernet.au/local/temp/doorbell_snapshot.jpg
 
   #################################################################
-  # 5. Optional chime
+  # 5. Speaker Announcement (Optional: Chime + TTS with Retry)
   #################################################################
 
   - choose:
       - conditions:
           - condition: template
-            value_template: >
-              {{ chime_file_value | default('') | length > 0 }}
+            value_template: "{{ enable_speaker_flag and primary_speaker != '' }}"
         sequence:
-          - service: media_player.play_media
+
+          # 5.1 Optional chime
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ enable_chime_flag and chime_file_value | default('') | length > 0 }}
+                sequence:
+                  - service: media_player.play_media
+                    target:
+                      entity_id: "{{ speaker_targets }}"
+                    data:
+                      media_content_id: "{{ chime_file_value }}"
+                      media_content_type: music
+
+          # 5.2 Set speaker volume
+          - service: media_player.volume_set
             target:
-              entity_id: !input sonos_group
+              entity_id: "{{ speaker_targets }}"
             data:
-              media_content_id: "{{ chime_file_value }}"
-              media_content_type: music
+              volume_level: "{{ speaker_volume_value }}"
 
-  #################################################################
-  # 6. Set Sonos volume
-  #################################################################
-
-  - service: media_player.volume_set
-    target:
-      entity_id: !input sonos_group
-    data:
-      volume_level: !input sonos_volume
-
-  #################################################################
-  # 7. TTS announcement with retry (Option A)
-  #################################################################
-
-  - repeat:
-      count: 2
-      sequence:
-
-        - service: tts.speak
-          target:
-            entity_id: !input tts_engine
-          data:
-            cache: true
-            media_player_entity_id: !input sonos_group
-            message: "Someone is at the front door"
-            language: en-US
-
-        - delay: "00:00:01.5"
-
-        - choose:
-            - conditions:
-                - condition: template
-                  value_template: >
-                    {{ is_state(sonos_entity, 'playing') }}
+          # 5.3 TTS announcement with retry (on primary speaker)
+          - repeat:
+              count: 2
               sequence:
-                - stop: "TTS succeeded"
+
+                - service: tts.speak
+                  target:
+                    entity_id: "{{ tts_engine_entity }}"
+                  data:
+                    cache: true
+                    media_player_entity_id: "{{ speaker_targets }}"
+                    message: "{{ tts_message_value }}"
+                    language: en-US
+
+                - delay: "00:00:01.5"
+
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: >
+                            {{ is_state(primary_speaker, 'playing') }}
+                      sequence:
+                        - stop: "TTS succeeded"
+
+          # 5.4 Restore speaker volume
+          - delay: "00:00:02"
+
+          - service: media_player.volume_set
+            target:
+              entity_id: "{{ speaker_targets }}"
+            data:
+              volume_level: "{{ original_speaker_volume }}"
 
   #################################################################
-  # 8. Restore Sonos volume
-  #################################################################
-
-  - delay: "00:00:02"
-
-  - service: media_player.volume_set
-    target:
-      entity_id: !input sonos_group
-    data:
-      volume_level: "{{ original_sonos_volume }}"
-
-  #################################################################
-  # 9. Phone notification
+  # 6. Phone Notification (Optional)
   #################################################################
 
   - choose:
       - conditions:
           - condition: template
             value_template: >
-              {{ phone_notify_target | default('') | length > 0 }}
+              {{ enable_phone_flag and phone_notify_target | default('') | length > 0 }}
         sequence:
           - service: "{{ phone_notify_target }}"
             data:
-              title: "Front Door Alert"
-              message: "Someone is at the front door"
+              title: "{{ phone_title_value }}"
+              message: "{{ phone_message_value }}"
+              {% if include_snapshot_phone_flag %}
               data:
                 image: "{{ image_path }}"
+              {% endif %}
 
   #################################################################
-  # 10. TvOverlay notification
+  # 7. TvOverlay Notification (Optional)
   #################################################################
 
   - choose:
       - conditions:
           - condition: template
-            value_template: >
-              {{ enable_tv_overlay_flag }}
+            value_template: "{{ enable_tv_overlay_flag }}"
         sequence:
           - service: rest_command.tvoverlay_doorbell
             data:
-              image_path: "{{ image_path }}"
+              image_path: "{{ image_path if include_snapshot_tv_flag else '' }}"
+              caption: "{{ overlay_caption_value }}"
