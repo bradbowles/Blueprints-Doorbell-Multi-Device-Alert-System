@@ -3,44 +3,26 @@ blueprint:
   description: >
     Sends snapshot, Sonos chime + TTS (with retry), phone notification,
     and TvOverlay notification on the TV when the doorbell is triggered.
-    Includes dynamic pause logic to skip the automation if selected entities
-    are in a specific state.
+    Includes a dynamic pause condition using Home Assistant's native
+    condition selector.
 
   domain: automation
 
   input:
 
     #################################################################
-    # 0. Pause Logic Inputs (Top of UI)
+    # 0. Pause Logic (Native HA Condition Selector)
     #################################################################
 
-    pause_entities:
-      name: Pause if these entities are in a specific state
+    pause_condition:
+      name: Pause condition
       description: >
-        Select one or more entities. If they match the pause state,
-        the automation will be skipped.
+        If this condition evaluates to true, the automation will be skipped.
+        You can use any combination of conditions (state, device, zone,
+        numeric, time, template, etc.).
+      default: []
       selector:
-        entity:
-          multiple: true
-
-    pause_state:
-      name: Pause state
-      description: >
-        If any/all selected entities are in this state, the automation will pause.
-      default: "on"
-      selector:
-        text:
-
-    pause_logic:
-      name: Pause logic
-      description: >
-        Choose whether ANY or ALL selected entities must match the pause state.
-      default: "any"
-      selector:
-        select:
-          options:
-            - any
-            - all
+        condition:
 
     #################################################################
     # 1. Doorbell Inputs
@@ -124,21 +106,9 @@ action:
   #################################################################
 
   - choose:
-      - conditions:
-          - condition: template
-            value_template: >
-              {% set entities = iif((!input pause_entities) is string, [!input pause_entities], !input pause_entities) %}
-              {% if entities | length == 0 %}
-                false
-              {% else %}
-                {% if !input pause_logic == 'any' %}
-                  {{ entities | select('is_state', !input pause_state) | list | length > 0 }}
-                {% else %}
-                  {{ entities | select('is_state', !input pause_state) | list | length == entities | length }}
-                {% endif %}
-              {% endif %}
+      - conditions: !input pause_condition
         sequence:
-          - stop: "Automation paused because a selected entity is in the pause state."
+          - stop: "Automation paused because the pause condition matched."
 
   #################################################################
   # 1. Trigger snapshot switch
