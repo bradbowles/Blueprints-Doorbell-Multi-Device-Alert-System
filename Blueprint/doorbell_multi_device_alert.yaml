@@ -5,34 +5,38 @@ blueprint:
     and TV overlay. Includes cache-busting, safe Sonos volume restore, and
     continue-on-error for TTS and TV overlay.
   domain: automation
+  source_url: https://raw.githubusercontent.com/bradbowles/Blueprints-Doorbell-Multi-Device-Alert-System/main/Blueprint/doorbell_multi_device_alert.yaml
+
   input:
+
     ding_sensor:
       name: Doorbell Ding Sensor
       selector:
         entity:
           domain: binary_sensor
+
     motion_sensor:
       name: Motion Sensor (optional)
       default: ""
+      optional: true
       selector:
         entity:
           domain: binary_sensor
-          multiple: false
-          optional: true
+
     person_sensor:
       name: Person Detection Sensor (optional)
       default: ""
+      optional: true
       selector:
         entity:
           domain: binary_sensor
-          multiple: false
-          optional: true
 
     snapshot_switch:
       name: Snapshot Trigger Switch
       selector:
         entity:
           domain: switch
+
     camera_entity:
       name: Camera
       selector:
@@ -44,6 +48,7 @@ blueprint:
       default: false
       selector:
         boolean: {}
+
     speaker_target:
       name: Speaker(s)
       default: []
@@ -51,17 +56,20 @@ blueprint:
         target:
           entity:
             domain: media_player
+
     tts_engine:
       name: TTS Engine
       default: tts.google_en_com
       selector:
         entity:
           domain: tts
+
     tts_message:
       name: TTS Message
       default: "Someone is at the front door"
       selector:
         text: {}
+
     tts_volume:
       name: TTS Volume
       default: 0.35
@@ -76,20 +84,24 @@ blueprint:
       default: true
       selector:
         boolean: {}
+
     phone_notify_service:
       name: Phone Notify Service
       selector:
         text: {}
+
     phone_title:
       name: Phone Notification Title
       default: "Doorbell Alert"
       selector:
         text: {}
+
     phone_message:
       name: Phone Notification Message
       default: "Someone is at the front door."
       selector:
         text: {}
+
     phone_include_snapshot:
       name: Include Snapshot in Phone Notification
       default: true
@@ -101,11 +113,13 @@ blueprint:
       default: false
       selector:
         boolean: {}
+
     tv_caption:
       name: TV Caption
       default: "Someone is at the front door"
       selector:
         text: {}
+
     tv_duration:
       name: TV Display Duration (seconds)
       default: 10
@@ -155,12 +169,11 @@ variables:
 
 action:
 
-  # Snapshot switch
+  # Trigger snapshot
   - service: switch.turn_on
     target:
       entity_id: !input snapshot_switch
 
-  # Allow camera to process
   - delay: "00:00:02"
 
   # Save snapshot
@@ -170,7 +183,6 @@ action:
     target:
       entity_id: !input camera_entity
 
-  # Ensure file is fully written
   - delay: "00:00:01"
 
   # Speaker announcement (continue on error)
@@ -216,7 +228,7 @@ action:
                   image_path: "{{ snapshot_url }}"
                   duration: "{{ tv_duration }}"
 
-  # Phone notification (must ALWAYS run)
+  # Phone notification (always runs)
   - choose:
       - conditions: "{{ phone_enabled }}"
         sequence:
