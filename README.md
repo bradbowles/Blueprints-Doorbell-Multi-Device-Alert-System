@@ -1,4 +1,4 @@
-# Doorbell – Multi Device Alert System (v2.1.2)
+# Doorbell – Multi Device Alert System (v2.1.3)
 
 A highly configurable Home Assistant blueprint that unifies doorbell events, motion detection, and person detection into a single automation. It captures a snapshot, sends optional speaker announcements, phone notifications, and TV overlay alerts — all with clean timing, VLAN-safe image delivery, and robust logic.
 
@@ -16,6 +16,15 @@ Trigger the automation using any combination of:
 
 Each trigger is optional and selectable in the UI.
 
+### 🌐 Dynamic Snapshot URL (NEW in v2.1.3)
+- New **base_url** input ensures snapshots work across:
+  - Local IPs  
+  - Hostnames  
+  - SSL setups  
+  - Reverse proxies  
+  - Nabu Casa  
+- Automatically appends a **cache‑buster** to prevent stale images
+
 ### 📸 Snapshot Handling
 - Triggers your snapshot switch  
 - Waits for the camera to process  
@@ -27,18 +36,21 @@ Each trigger is optional and selectable in the UI.
 - Optional chime before TTS  
 - Single‑shot TTS (no double‑plays)  
 - Temporary volume override + automatic restore  
+- Safe volume restore (NEW in v2.1.3)
 
 ### 📱 Phone Notifications
 - Optional mobile notification  
 - Optional snapshot attachment  
 - Fully templated title and message  
+- Uses dynamic URL with cache‑buster (NEW in v2.1.3)
 
 ### 📺 TV Overlay Notification
 - Optional TV overlay  
 - Optional snapshot image  
 - Adjustable display duration  
 - VLAN‑safe image URL  
-- Uses the **TvOverlay** app (no PiP HTML required)
+- Uses the **TvOverlay** app  
+- Now uses safe `continue_on_error` (NEW in v2.1.3)
 
 ### ⏸ Pause Logic
 Use any Home Assistant condition to temporarily disable the automation.
@@ -47,10 +59,20 @@ Use any Home Assistant condition to temporarily disable the automation.
 
 ## 🧩 Inputs Overview
 
+### Base URL (NEW in v2.1.3)
+A required input used to generate the dynamic snapshot URL.
+
+**Example:**  
+```
+http://homeassistant.local:8123
+```
+
+If your Home Assistant instance uses a different hostname, IP, port, or SSL, enter that instead.
+
 ### Triggers
-- **Doorbell ding sensor**
-- **Motion sensor**
-- **Person detection sensor**
+- Doorbell ding sensor  
+- Motion sensor  
+- Person detection sensor  
 
 ### Snapshot
 - Snapshot trigger switch  
@@ -115,7 +137,17 @@ Ensure this directory exists:
 /config/www/temp/
 ```
 
-### 2. TvOverlay REST Command
+### 2. Base URL (NEW in v2.1.3)
+Set the **Base URL** input to match your Home Assistant instance.
+
+Examples:
+```
+http://homeassistant.local:8123
+http://192.168.20.10:8123
+https://ha.example.com
+```
+
+### 3. TvOverlay REST Command
 Add this to `configuration.yaml`:
 
 ```yaml
@@ -135,7 +167,7 @@ rest_command:
 
 Replace `<YOUR_OVERLAY_SERVER_IP>` with your overlay server address.
 
-### 3. Firewall (UniFi / VLAN Users)
+### 4. Firewall (UniFi / VLAN Users)
 If your TV is on a different VLAN than Home Assistant, ensure:
 
 - TV VLAN → HA IP (port 8123) is allowed  
@@ -182,7 +214,6 @@ config/blueprints/automation/doorbell_multi_device_alert.yaml
 
 3. Reload automations or restart Home Assistant.
 
-
 ---
 
 ## 🧪 Testing
@@ -209,17 +240,27 @@ You should see:
 - Ensure TvOverlay is running on the Google TV device  
 
 ### Speaker TTS double‑plays
-- v2.1.2 uses **single‑shot TTS** to eliminate this issue  
-- If you still hear two announcements, check for duplicate automations  
+- v2.1.3 uses **single‑shot TTS**  
+- Includes safe volume restore and error‑tolerant playback  
 
 ### Phone notification missing image
 - Ensure `/config/www/temp/` exists  
 - Ensure the snapshot switch is firing  
 - Ensure your phone notify service supports images  
+- Ensure **Base URL** is correct  
 
 ---
 
 ## 📝 Changelog
+
+### v2.1.3
+- Added **base_url** input (required)
+- Added dynamic snapshot URL with cache‑buster
+- Removed unsupported `hass` reference (blueprint‑safe)
+- Added safe `continue_on_error` for TTS and TV overlay
+- Added safe volume restore for speakers
+- Improved snapshot timing to eliminate stale images
+- Preserved full v2.1.2 structure and inputs
 
 ### v2.1.2
 - Added ding/motion/person multi-trigger support  
