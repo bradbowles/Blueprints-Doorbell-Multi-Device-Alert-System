@@ -1,10 +1,10 @@
 blueprint:
-  name: Doorbell - Multi Device Alert System (v2.1.1)
+  name: Doorbell - Multi Device Alert System (v2.1.2)
   description: >
     Sends snapshot, optional speaker chime and single-shot TTS, optional phone
     notification, and optional TV overlay notification with adjustable display
-    duration when the doorbell is triggered. Includes a dynamic pause condition
-    using Home Assistant's native condition selector.
+    duration when the doorbell is triggered by ding, motion, or person detection.
+    Includes a dynamic pause condition using Home Assistant's native condition selector.
 
   domain: automation
 
@@ -16,21 +16,44 @@ blueprint:
 
     pause_condition:
       name: Pause - Condition to pause automation
-      description: >
-        If this condition evaluates to true, the automation will be skipped.
       default: []
       selector:
         condition:
 
     #################################################################
-    # 1. Doorbell and Snapshot Inputs
+    # 1. Trigger Inputs (Ding, Motion, Person)
     #################################################################
 
     doorbell_trigger:
-      name: Doorbell - Trigger sensor
+      name: Doorbell - Ding sensor
+      description: >
+        Binary sensor that fires when the doorbell button is pressed.
+      default: []
       selector:
         entity:
           domain: binary_sensor
+
+    motion_trigger:
+      name: Doorbell - Motion sensor
+      description: >
+        Binary sensor that fires when motion is detected.
+      default: []
+      selector:
+        entity:
+          domain: binary_sensor
+
+    person_trigger:
+      name: Doorbell - Person detection sensor
+      description: >
+        Binary sensor that fires when a person is detected.
+      default: []
+      selector:
+        entity:
+          domain: binary_sensor
+
+    #################################################################
+    # 2. Snapshot Inputs
+    #################################################################
 
     snapshot_switch:
       name: Snapshot - Trigger switch
@@ -45,7 +68,7 @@ blueprint:
           domain: camera
 
     #################################################################
-    # 2. Speaker Announcement
+    # 3. Speaker Announcement
     #################################################################
 
     speaker_enable:
@@ -98,7 +121,7 @@ blueprint:
           multiline: true
 
     #################################################################
-    # 3. Phone Notification
+    # 4. Phone Notification
     #################################################################
 
     phone_enable:
@@ -134,7 +157,7 @@ blueprint:
         boolean:
 
     #################################################################
-    # 4. TV Overlay
+    # 5. TV Overlay
     #################################################################
 
     tv_enable:
@@ -168,9 +191,21 @@ blueprint:
 
 mode: single
 
+#################################################################
+#  TRIGGERS — Ding OR Motion OR Person
+#################################################################
+
 trigger:
   - platform: state
     entity_id: !input doorbell_trigger
+    to: "on"
+
+  - platform: state
+    entity_id: !input motion_trigger
+    to: "on"
+
+  - platform: state
+    entity_id: !input person_trigger
     to: "on"
 
 action:
