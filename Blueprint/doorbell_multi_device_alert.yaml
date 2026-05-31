@@ -1,12 +1,51 @@
 blueprint:
   name: Doorbell - Multi-Device Alert System (TvOverlay, UI-Safe)
   description: >
-    Sends snapshot, Sonos chime + TTS, phone notification,
+    Sends snapshot, Sonos chime + TTS (with retry), phone notification,
     and TvOverlay notification on the TV when the doorbell is triggered.
+    Includes dynamic pause logic to skip the automation if selected entities
+    are in a specific state.
 
   domain: automation
 
   input:
+
+    #################################################################
+    # 0. Pause Logic Inputs (Top of UI)
+    #################################################################
+
+    pause_entities:
+      name: Pause if these entities are in a specific state
+      description: >
+        Select one or more entities. If they match the pause state,
+        the automation will be skipped.
+      selector:
+        entity:
+          multiple: true
+
+    pause_state:
+      name: Pause state
+      description: >
+        If any/all selected entities are in this state, the automation will pause.
+      default: "on"
+      selector:
+        text:
+
+    pause_logic:
+      name: Pause logic
+      description: >
+        Choose whether ANY or ALL selected entities must match the pause state.
+      default: "any"
+      selector:
+        select:
+          options:
+            - any
+            - all
+
+    #################################################################
+    # 1. Doorbell Inputs
+    #################################################################
+
     doorbell_trigger:
       name: Doorbell Trigger (ding)
       selector:
@@ -81,6 +120,27 @@ trigger:
 action:
 
   #################################################################
+  # 0. Pause Logic (Skip Automation)
+  #################################################################
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {% set entities = iif((!input pause_entities) is string, [!input pause_entities], !input pause_entities) %}
+              {% if entities | length == 0 %}
+                false
+              {% else %}
+                {% if !input pause_logic == 'any' %}
+                  {{ entities | select('is_state', !input pause_state) | list | length > 0 }}
+                {% else %}
+                  {{ entities | select('is_state', !input pause_state) | list | length == entities | length }}
+                {% endif %}
+              {% endif %}
+        sequence:
+          - stop: "Automation paused because a selected entity is in the pause state."
+
+  #################################################################
   # 1. Trigger snapshot switch
   #################################################################
 
@@ -129,7 +189,6 @@ action:
           - condition: template
             value_template: >
               {{ chime_file_value | default('') | length > 0 }}
-
         sequence:
           - service: media_player.play_media
             target:
@@ -149,17 +208,31 @@ action:
       volume_level: !input sonos_volume
 
   #################################################################
-  # 7. TTS announcement
+  # 7. TTS announcement with retry (Option A)
   #################################################################
 
-  - service: tts.speak
-    target:
-      entity_id: !input tts_engine
-    data:
-      cache: true
-      media_player_entity_id: !input sonos_group
-      message: "Someone is at the front door"
-      language: en-US
+  - repeat:
+      count: 2
+      sequence:
+
+        - service: tts.speak
+          target:
+            entity_id: !input tts_engine
+          data:
+            cache: true
+            media_player_entity_id: !input sonos_group
+            message: "Someone is at the front door"
+            language: en-US
+
+        - delay: "00:00:01.5"
+
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: >
+                    {{ is_state(sonos_entity, 'playing') }}
+              sequence:
+                - stop: "TTS succeeded"
 
   #################################################################
   # 8. Restore Sonos volume
@@ -182,7 +255,6 @@ action:
           - condition: template
             value_template: >
               {{ phone_notify_target | default('') | length > 0 }}
-
         sequence:
           - service: "{{ phone_notify_target }}"
             data:
@@ -200,7 +272,6 @@ action:
           - condition: template
             value_template: >
               {{ enable_tv_overlay_flag }}
-
         sequence:
           - service: rest_command.tvoverlay_doorbell
             data:
