@@ -1,4 +1,4 @@
-# Doorbell – Multi Device Alert System (v2.1.3)
+# Doorbell – Multi Device Alert System
 
 A highly configurable Home Assistant blueprint that unifies doorbell events, motion detection, and person detection into a single automation. It captures a snapshot, sends optional speaker announcements, phone notifications, and TV overlay alerts — all with clean timing, VLAN-safe image delivery, and robust logic.
 
@@ -16,7 +16,7 @@ Trigger the automation using any combination of:
 
 Each trigger is optional and selectable in the UI.
 
-### 🌐 Dynamic Snapshot URL (NEW in v2.1.3)
+### 🌐 Dynamic Snapshot URL
 - New **base_url** input ensures snapshots work across:
   - Local IPs  
   - Hostnames  
@@ -33,16 +33,18 @@ Each trigger is optional and selectable in the UI.
 
 ### 🔊 Speaker Announcement
 - Optional speaker announcement  
-- Optional chime before TTS  
+- Optional chime before TTS with configurable chime duration  
 - Single‑shot TTS (no double‑plays)  
 - Temporary volume override + automatic restore  
-- Safe volume restore (NEW in v2.1.3)
+- Safe volume restore when speakers are off or unavailable
 
 ### 📱 Phone Notifications
 - Optional mobile notification  
+- Supports **multiple devices** via comma-separated notify services  
+- Each device notified independently (one failure won't block others)  
 - Optional snapshot attachment  
 - Fully templated title and message  
-- Uses dynamic URL with cache‑buster (NEW in v2.1.3)
+- Uses dynamic URL with cache‑buster
 
 ### 📺 TV Overlay Notification
 - Optional TV overlay  
@@ -50,7 +52,7 @@ Each trigger is optional and selectable in the UI.
 - Adjustable display duration  
 - VLAN‑safe image URL  
 - Uses the **TvOverlay** app  
-- Now uses safe `continue_on_error` (NEW in v2.1.3)
+- Safe `continue_on_error` handling
 
 ### ⏸ Pause Logic
 Use any Home Assistant condition to temporarily disable the automation.
@@ -59,7 +61,7 @@ Use any Home Assistant condition to temporarily disable the automation.
 
 ## 🧩 Inputs Overview
 
-### Base URL (NEW in v2.1.3)
+### Base URL
 A required input used to generate the dynamic snapshot URL.
 
 **Example:**  
@@ -84,11 +86,11 @@ If your Home Assistant instance uses a different hostname, IP, port, or SSL, ent
 - TTS engine  
 - Message  
 - Volume  
-- Optional chime  
+- Optional chime + chime duration  
 
 ### Phone
 - Enable/disable  
-- Notify service  
+- Notify service(s) — comma-separated for multiple devices  
 - Title + message  
 - Include snapshot  
 
@@ -124,8 +126,6 @@ This blueprint is designed to be vendor‑agnostic and should work with any Home
 - Optional `notify.*` services for phone alerts  
 - Optional REST endpoint for TV overlay (TvOverlay or similar)
 
-Although tested with Arlo, Sonos, UniFi, and Google TV, the blueprint is expected to work with a wide range of doorbells, cameras, speakers, and TV devices supported by Home Assistant.
-
 ---
 
 ## 🛠 Requirements
@@ -137,7 +137,7 @@ Ensure this directory exists:
 /config/www/temp/
 ```
 
-### 2. Base URL (NEW in v2.1.3)
+### 2. Base URL
 Set the **Base URL** input to match your Home Assistant instance.
 
 Examples:
@@ -171,7 +171,7 @@ Replace `<YOUR_OVERLAY_SERVER_IP>` with your overlay server address.
 If your TV is on a different VLAN than Home Assistant, ensure:
 
 - TV VLAN → HA IP (port 8123) is allowed  
-- No “Drop Inter‑VLAN” rule is above your allow rule  
+- No "Drop Inter‑VLAN" rule is above your allow rule  
 - The rule is placed in the correct **zone‑pair** (e.g., Media → HAOS)
 
 ---
@@ -216,6 +216,16 @@ config/blueprints/automation/doorbell_multi_device_alert.yaml
 
 ---
 
+## 🔄 Updating the Blueprint
+
+Home Assistant does **not** automatically notify you when a blueprint is updated upstream. To stay up to date:
+
+- **Watch this repository** on GitHub (top right → Watch → Custom → Releases) to get notified when a new version is published.
+- When a new version is available, re-import using the one-click button or RAW URL above. Home Assistant will prompt you to confirm the update.
+- Check the [CHANGELOG](./CHANGELOG.md) for what changed before updating.
+
+---
+
 ## 🧪 Testing
 
 Trigger any of the following:
@@ -240,8 +250,12 @@ You should see:
 - Ensure TvOverlay is running on the Google TV device  
 
 ### Speaker TTS double‑plays
-- v2.1.3 uses **single‑shot TTS**  
+- Uses single‑shot TTS  
 - Includes safe volume restore and error‑tolerant playback  
+
+### Speaker volume error when speakers are off
+- Safe volume restore handles unavailable speakers gracefully  
+- Falls back to 0.35 if volume level cannot be read  
 
 ### Phone notification missing image
 - Ensure `/config/www/temp/` exists  
@@ -249,27 +263,15 @@ You should see:
 - Ensure your phone notify service supports images  
 - Ensure **Base URL** is correct  
 
+### Only one phone receiving notifications
+- Ensure notify services are comma-separated in the Phone notify service(s) field  
+- Example: `notify.mobile_app_johns_phone, notify.mobile_app_janes_phone`
+
 ---
 
 ## 📝 Changelog
 
-### v2.1.3
-- Added **base_url** input (required)
-- Added dynamic snapshot URL with cache‑buster
-- Removed unsupported `hass` reference (blueprint‑safe)
-- Added safe `continue_on_error` for TTS and TV overlay
-- Added safe volume restore for speakers
-- Improved snapshot timing to eliminate stale images
-- Preserved full v2.1.2 structure and inputs
-
-### v2.1.2
-- Added ding/motion/person multi-trigger support  
-- Improved snapshot timing  
-- Added adjustable TV display duration  
-- Simplified TTS to single-shot  
-- Cleaned variable handling  
-- Improved VLAN compatibility for image delivery  
-- Removed PiP overlay requirement (TvOverlay replaces it fully)
+See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
 
 ---
 
